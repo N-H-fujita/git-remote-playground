@@ -1,0 +1,12 @@
+# local pseudo remote repositories
+repos/
+
+# node
+node_modules/
+
+# next
+.next/
+out/
+
+# env
+.env*
