@@ -33,13 +33,24 @@ export async function POST(req: Request) {
 
     // JSONを受け取る(失敗したら空オブジェクト)
     const body = await req.json().catch(() => ({}));
-    const name = typeof body.name === "string" ? body.name : "";
+    const rawName = typeof body.name === "string" ? body.name.trim() : "";
 
-    if(!name) {
-      return NextResponse.json({ error: "name is required"}, { status: 400 });
+    if (!rawName) {
+      return NextResponse.json({ error: "name is required" }, { status: 400 });
     }
 
-    const repoName = name.endsWith(".git") ? name : `${name}.git`;
+    // バリデーション（まずは最小ルール）
+    // - パス区切り（/ \）や空白、制御文字などを禁止
+    // - 英数と . _ - のみ許可
+    if (!/^[a-zA-Z0-9._-]+$/.test(rawName)) {
+      return NextResponse.json(
+        { error: 'invalid name (use a-z A-Z 0-9 "._-")' },
+        { status: 400 }
+      );
+    }
+
+    // 正規化：必ず .git を付ける
+    const repoName = rawName.endsWith(".git") ? rawName : `${rawName}.git`;
     const repoPath = path.join(REPOS_DIR, repoName);
 
     if (fs.existsSync(repoPath)) {
@@ -58,4 +69,5 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
+
 
