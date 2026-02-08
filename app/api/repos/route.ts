@@ -21,7 +21,7 @@ export async function GET() {
       .filter((e) => e.isDirectory() && e.name.endsWith(".git"))
       .map((e) => ({ name: e.name }));
 
-    return NextResponse.json(repos);
+    return NextResponse.json({ repos });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
@@ -63,7 +63,7 @@ export async function POST(req: Request) {
     execSync(`git init --bare "${repoPath}"`);
     return NextResponse.json({
       message: "Bare repository created",
-      name: repoName,
+      repo: { name: repoName },
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
