@@ -1,62 +1,68 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type Repo = { name: string };
-type ReposResponse = { repos: Repo[]; error?: string };
+type RepoResponse = { repos: Repo[], error?: string }
 
 export function RepoList() {
   const [repos, setRepos] = useState<Repo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let aborted = false;
+  const abortedRef = useRef(false);
 
-    (async () => {
-      try {
-        setLoading(true);
-        setError(null);
+  const fetchRepos = useCallback(async (mode: "initial" | "refresh") => {
+    const setBusy = mode === "initial" ? setLoading : setRefreshing;
 
-        const res = await fetch("/api/repos", {
-          // GETはキャッシュで「増えたのに増えない」になりやすいので開発中は切る
-          cache: "no-store",
-        });
+    try {
+      setBusy(true);
+      setError(null);
 
-        const data = (await res.json()) as ReposResponse;
+      const res = await fetch("/api/repos", { cache: "no-store" });
+      const data = (await res.json()) as RepoResponse;
 
-        if (!res.ok) {
-          // API側が { error } で返してる前提に合わせる
-          throw new Error(data.error ?? `Request failed: ${res.status}`);
-        }
+      if(!res.ok) throw new Error(data.error ?? `Request failed: ${res.status}`);
 
-        if (!aborted) {
-          setRepos(data.repos ?? []);
-        }
-      } catch (e) {
-        if (!aborted) {
-          setError(e instanceof Error ? e.message : "Unknown error");
-        }
-      } finally {
-        if (!aborted) {
-          setLoading(false);
-        }
+      if(!abortedRef.current) setRepos(data.repos ?? []);
+    } catch(e) {
+      if(!abortedRef.current) {
+        setError(e instanceof Error ? e.message : "Unknown error");
       }
-    })();
+    } finally {
+      if(!abortedRef.current) setBusy(false);
+    }
+  }, [abortedRef]);
 
+  useEffect(() => {
+    abortedRef.current = false;
+    void fetchRepos("initial");
     return () => {
-      aborted = true;
+      abortedRef.current = true;
     };
-  }, []);
+  }, [fetchRepos]);
 
-  if (loading) return <p>Loading...</p>;
-  if (error) return <p style={{ color: "crimson" }}>Error: {error}</p>;
+  if(loading) return <p>Loading...</p>
+  // if(error) return <p style={{ color: "crimson" }}>Error: {error}</p>
 
-  return (
-    <ul>
-      {repos.map((r) => (
-        <li key={r.name}>{r.name}</li>
-      ))}
-    </ul>
+  return(
+    <div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <button
+          type="button"
+          onClick={() => void fetchRepos("refresh")}
+          disabled={loading || refreshing}
+        >
+          {refreshing ? "Reloading..." : "Reload"}
+        </button>
+        {error && <span style={{ color: "crimson" }}>Error: {error}</span> }
+      </div>
+      <ul style={{ marginTop: 12 }}>
+        {repos.map((r) => (
+          <li key={r.name}>{r.name}</li>
+        ))}
+      </ul>
+    </div>
   );
 }
